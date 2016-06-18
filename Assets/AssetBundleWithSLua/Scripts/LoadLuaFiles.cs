@@ -9,7 +9,6 @@ public class LoadLuaFiles : MonoBehaviour
     public string luaAssetBundle;
     public string luaAssetFile;
     TextAsset luaScript;
-    LuaState state;
     LuaSvr svr;
     LuaTable self;
     LuaFunction update;
@@ -19,10 +18,10 @@ public class LoadLuaFiles : MonoBehaviour
     {
         yield return StartCoroutine(Initialize());
 
-        // Load lua files
+        // Load script files
         yield return StartCoroutine(InitializeLuaAsync());
 
-        // Start lua script
+        // Then after retreived scrip files, Start lua scripts
         StartLuaScript();
     }
 
@@ -70,19 +69,34 @@ public class LoadLuaFiles : MonoBehaviour
 
     void StartLuaScript()
     {
+        // Make sure that we got script file before start
         if (luaScript != null)
         {
-            state = new LuaState();
-            object obj;
-            if (state.doBuffer(luaScript.bytes, "@" + luaAssetFile, out obj))
+            // Initializing
+            svr = new LuaSvr();
+            svr.init(null, () =>
             {
-                svr = new LuaSvr();
-                svr.init(null, () =>
+                object obj;
+                // Reading lua scripts
+                if (svr.luaState.doBuffer(luaScript.bytes, "Here can be any name but should unique", out obj))
                 {
-                    self = (LuaTable)svr.start("circle/circle");
-                    update = (LuaFunction)self["update"];
-                });
-            }
+                    // Calling main function from lua script
+                    LuaFunction func = (LuaFunction)svr.luaState["main"];
+                    if (func != null)
+                    {
+                        self = (LuaTable)func.call();
+                        update = (LuaFunction)self["update"];
+                    }
+                    else
+                    {
+                        Debug.LogError("No main function");
+                    }
+                }
+                else
+                {
+                    Debug.LogError("Can not read scripts");
+                }
+            });
         }
     }
 
